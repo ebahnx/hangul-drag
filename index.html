@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Spell it in Korean</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --accent: #38bdf8;
+    --good: #4ade80;
+    --bad: #f87171;
+    --tile: #f8fafc;
+    --tile-text: #0f172a;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #1e3a5f, var(--bg));
+    color: #f1f5f9;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; }
+  .progress { color: var(--muted); font-size: 1.15rem; margin-bottom: 20px; }
+  .card {
+    background: var(--card); border-radius: 24px; padding: 36px 28px 40px;
+    width: min(1100px, 100%); box-shadow: 0 20px 50px rgba(0,0,0,.35);
+  }
+  .english {
+    text-align: center; font-size: clamp(3.2rem, 9vw, 5rem); font-weight: 800;
+    margin: 0 0 10px; letter-spacing: 0.02em;
+  }
+  .hint { text-align: center; color: var(--muted); font-size: 1.25rem; margin-bottom: 28px; }
+  .slots {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 14px;
+    min-height: 120px; margin-bottom: 32px; padding: 16px;
+    border: 2px dashed #334155; border-radius: 16px; background: rgba(15,23,42,.4);
+  }
+  .slot {
+    width: 100px; height: 112px; border-radius: 16px;
+    background: #0f172a; border: 3px solid #475569;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px;
+    font-size: 2.6rem; font-weight: 700;
+  }
+  .slot.filled { background: #fff; color: #0f172a; border-color: var(--accent); }
+  .slot.over { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(56,189,248,.35); }
+  .tray-label { font-size: 1rem; color: var(--muted); margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .tray {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 14px;
+    min-height: 120px;
+  }
+  .tile, .slot {
+    flex-direction: column;
+    gap: 4px;
+    width: 100px; height: 112px;
+  }
+  .tile {
+    border-radius: 16px;
+    background: var(--tile); color: var(--tile-text);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.6rem; font-weight: 700;
+    cursor: grab; user-select: none;
+    box-shadow: 0 5px 0 #cbd5e1;
+    touch-action: none;
+  }
+  .jamo { line-height: 1.05; font-size: 2.6rem; }
+  .roma {
+    font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em;
+    color: #475569; text-transform: lowercase; line-height: 1.1;
+  }
+  .slot .roma { color: #64748b; }
+  .slot.filled .roma { color: #334155; }
+
+  .tile:active { cursor: grabbing; }
+  .tile.dragging { opacity: 0.45; }
+  .tile.used { visibility: hidden; pointer-events: none; }
+  .actions { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 30px; }
+  button {
+    border: 0; border-radius: 999px; padding: 16px 28px;
+    font-size: 1.25rem; font-weight: 700; cursor: pointer;
+  }
+  .btn-check { background: var(--accent); color: #0f172a; }
+  .btn-clear { background: #334155; color: #f1f5f9; }
+  .btn-next { background: var(--good); color: #052e16; }
+  .btn-hint { background: #475569; color: #f1f5f9; }
+  .feedback {
+    text-align: center; min-height: 1.6em; margin-top: 16px;
+    font-size: 1.45rem; font-weight: 700;
+  }
+  .feedback.good { color: var(--good); }
+  .feedback.bad { color: var(--bad); }
+  .done {
+    text-align: center; padding: 40px 20px;
+  }
+  .done h2 { font-size: 2rem; margin: 0 0 12px; }
+  .ghost {
+    position: fixed; pointer-events: none; z-index: 1000;
+    width: 100px; height: 112px; border-radius: 16px;
+    background: var(--tile); color: var(--tile-text);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px;
+    font-size: 2.6rem; font-weight: 700;
+    box-shadow: 0 12px 30px rgba(0,0,0,.4);
+    transform: translate(-50%, -50%);
+  }
+  .ghost .roma { color: #475569; font-size: 1.05rem; font-weight: 700; text-transform: lowercase; }
+  .ghost .jamo { font-size: 2.6rem; }
+</style>
+</head>
+<body>
+  <h1>Spell it in Korean</h1>
+  <div class="progress" id="progress"></div>
+  <div class="card" id="game">
+    <div class="english" id="english"></div>
+    <div class="hint">Drag letters into the boxes — small English sounds are under each letter</div>
+    <div class="slots" id="slots"></div>
+    <div class="tray-label">Letters</div>
+    <div class="tray" id="tray"></div>
+    <div class="feedback" id="feedback"></div>
+    <div class="actions">
+      <button type="button" class="btn-clear" id="btnClear">Clear</button>
+      <button type="button" class="btn-hint" id="btnHint">Peek</button>
+      <button type="button" class="btn-check" id="btnCheck">Check</button>
+      <button type="button" class="btn-next" id="btnNext" hidden>Next →</button>
+    </div>
+  </div>
+  <div class="card done" id="done" hidden>
+    <h2>Nice work! 🎉</h2>
+    <p>You spelled all 10 English-sounding words in Korean.</p>
+    <button type="button" class="btn-next" id="btnRestart">Play again</button>
+  </div>
+
+<script>
+// Konglish / loanwords: English → Hangul jamo sequence (precomposed syllables as answer display)
+// Each answer is built from jamo tiles that compose into syllables for checking as joined string of tiles in order.
+const WORDS = [
+  { en: "coffee", ko: "커피", jamo: ["ㅋ","ㅓ","ㅍ","ㅣ"] },
+  { en: "pizza", ko: "피자", jamo: ["ㅍ","ㅣ","ㅈ","ㅏ"] },
+  { en: "bus", ko: "버스", jamo: ["ㅂ","ㅓ","ㅅ","ㅡ"] },
+  { en: "cake", ko: "케이크", jamo: ["ㅋ","ㅔ","ㅇ","ㅣ","ㅋ","ㅡ"] },
+  { en: "juice", ko: "주스", jamo: ["ㅈ","ㅜ","ㅅ","ㅡ"] },
+  { en: "banana", ko: "바나나", jamo: ["ㅂ","ㅏ","ㄴ","ㅏ","ㄴ","ㅏ"] },
+  { en: "ice cream", ko: "아이스크림", jamo: ["ㅇ","ㅏ","ㅇ","ㅣ","ㅅ","ㅡ","ㅋ","ㅡ","ㄹ","ㅣ","ㅁ"] },
+  { en: "hamburger", ko: "햄버거", jamo: ["ㅎ","ㅐ","ㅁ","ㅂ","ㅓ","ㄱ","ㅓ"] },
+  { en: "cola", ko: "콜라", jamo: ["ㅋ","ㅗ","ㄹ","ㄹ","ㅏ"] },
+  { en: "taxi", ko: "택시", jamo: ["ㅌ","ㅐ","ㄱ","ㅅ","ㅣ"] },
+];
+
+// Distractors pool (common jamo)
+const EXTRA = ["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ","ㅏ","ㅑ","ㅓ","ㅕ","ㅗ","ㅛ","ㅜ","ㅠ","ㅡ","ㅣ","ㅔ","ㅐ"];
+
+
+const ROMA = {
+  "ㄱ":"g/k","ㄲ":"kk","ㄴ":"n","ㄷ":"d/t","ㄸ":"tt","ㄹ":"r/l","ㅁ":"m","ㅂ":"b/p","ㅃ":"pp",
+  "ㅅ":"s","ㅆ":"ss","ㅇ":"ng/-","ㅈ":"j","ㅉ":"jj","ㅊ":"ch","ㅋ":"k","ㅌ":"t","ㅍ":"p","ㅎ":"h",
+  "ㅏ":"a","ㅑ":"ya","ㅓ":"eo","ㅕ":"yeo","ㅗ":"o","ㅛ":"yo","ㅜ":"u","ㅠ":"yu","ㅡ":"eu","ㅣ":"i",
+  "ㅐ":"ae","ㅔ":"e","ㅒ":"yae","ㅖ":"ye","ㅘ":"wa","ㅙ":"wae","ㅚ":"oe","ㅝ":"wo","ㅞ":"we","ㅟ":"wi","ㅢ":"ui"
+};
+function roma(j){ return ROMA[j] || ""; }
+function tileHTML(jamo){
+  return `<span class="jamo">${jamo}</span><span class="roma">${roma(jamo)}</span>`;
+}
+
+let index = 0;
+let slots = []; // {jamo|null, tileId|null}
+let tiles = []; // {id, jamo, used}
+let drag = null; // {tileId, from:'tray'|'slot', slotIndex?}
+
+const elProgress = document.getElementById("progress");
+const elEnglish = document.getElementById("english");
+const elSlots = document.getElementById("slots");
+const elTray = document.getElementById("tray");
+const elFeedback = document.getElementById("feedback");
+const elGame = document.getElementById("game");
+const elDone = document.getElementById("done");
+const btnCheck = document.getElementById("btnCheck");
+const btnNext = document.getElementById("btnNext");
+const btnClear = document.getElementById("btnClear");
+const btnHint = document.getElementById("btnHint");
+const btnRestart = document.getElementById("btnRestart");
+
+function shuffle(a) {
+  const arr = a.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function loadWord(i) {
+  index = i;
+  const w = WORDS[i];
+  elProgress.textContent = `Word ${i + 1} of ${WORDS.length}`;
+  elEnglish.textContent = w.en;
+  elFeedback.textContent = "";
+  elFeedback.className = "feedback";
+  btnNext.hidden = true;
+  btnCheck.hidden = false;
+
+  const need = w.jamo.length;
+  // add 4–6 distractors not already in answer
+  const answerSet = new Set(w.jamo);
+  const distractors = shuffle(EXTRA.filter(j => !answerSet.has(j))).slice(0, Math.min(6, Math.max(4, 10 - need)));
+  const pool = shuffle([...w.jamo, ...distractors]);
+
+  tiles = pool.map((jamo, n) => ({ id: `t${n}`, jamo, used: false }));
+  slots = Array.from({ length: need }, () => ({ jamo: null, tileId: null }));
+  render();
+}
+
+function render() {
+  elSlots.innerHTML = "";
+  slots.forEach((s, i) => {
+    const div = document.createElement("div");
+    div.className = "slot" + (s.jamo ? " filled" : "");
+    div.dataset.slot = i;
+    div.innerHTML = s.jamo ? tileHTML(s.jamo) : "";
+    elSlots.appendChild(div);
+  });
+
+  elTray.innerHTML = "";
+  tiles.forEach(t => {
+    const div = document.createElement("div");
+    div.className = "tile" + (t.used ? " used" : "");
+    div.dataset.tile = t.id;
+    div.innerHTML = tileHTML(t.jamo);
+    elTray.appendChild(div);
+  });
+}
+
+function placeTileInSlot(tileId, slotIndex) {
+  const tile = tiles.find(t => t.id === tileId);
+  if (!tile || tile.used) return;
+  const slot = slots[slotIndex];
+  // if slot occupied, return that tile to tray
+  if (slot.tileId) {
+    const old = tiles.find(t => t.id === slot.tileId);
+    if (old) old.used = false;
+  }
+  slot.jamo = tile.jamo;
+  slot.tileId = tile.id;
+  tile.used = true;
+  elFeedback.textContent = "";
+  elFeedback.className = "feedback";
+  btnNext.hidden = true;
+  btnCheck.hidden = false;
+  render();
+}
+
+function clearSlot(slotIndex) {
+  const slot = slots[slotIndex];
+  if (!slot.tileId) return;
+  const tile = tiles.find(t => t.id === slot.tileId);
+  if (tile) tile.used = false;
+  slot.jamo = null;
+  slot.tileId = null;
+  render();
+}
+
+function clearAll() {
+  slots.forEach((_, i) => clearSlot(i));
+  elFeedback.textContent = "";
+  elFeedback.className = "feedback";
+  btnNext.hidden = true;
+  btnCheck.hidden = false;
+}
+
+function check() {
+  const w = WORDS[index];
+  const built = slots.map(s => s.jamo).join("");
+  const target = w.jamo.join("");
+  if (slots.some(s => !s.jamo)) {
+    elFeedback.textContent = "Fill every box first";
+    elFeedback.className = "feedback bad";
+    return;
+  }
+  if (built === target) {
+    elFeedback.textContent = `Correct! ${w.en} → ${w.ko}`;
+    elFeedback.className = "feedback good";
+    btnCheck.hidden = true;
+    btnNext.hidden = false;
+  } else {
+    elFeedback.textContent = "Not quite — try again";
+    elFeedback.className = "feedback bad";
+  }
+}
+
+function peek() {
+  elFeedback.textContent = `Answer: ${WORDS[index].ko}`;
+  elFeedback.className = "feedback";
+}
+
+function next() {
+  if (index + 1 >= WORDS.length) {
+    elGame.hidden = true;
+    elDone.hidden = false;
+    elProgress.textContent = "Done";
+  } else {
+    loadWord(index + 1);
+  }
+}
+
+// Pointer drag
+let ghost = null;
+function startDrag(clientX, clientY, tileId, from, slotIndex) {
+  drag = { tileId, from, slotIndex };
+  const tile = tiles.find(t => t.id === tileId);
+  if (!tile) return;
+  ghost = document.createElement("div");
+  ghost.className = "ghost";
+  ghost.innerHTML = tileHTML(tile.jamo);
+  ghost.style.left = clientX + "px";
+  ghost.style.top = clientY + "px";
+  document.body.appendChild(ghost);
+  const el = document.querySelector(`[data-tile="${tileId}"]`);
+  if (el) el.classList.add("dragging");
+}
+
+function moveDrag(clientX, clientY) {
+  if (!ghost) return;
+  ghost.style.left = clientX + "px";
+  ghost.style.top = clientY + "px";
+  document.querySelectorAll(".slot").forEach(s => s.classList.remove("over"));
+  const under = document.elementFromPoint(clientX, clientY);
+  const slot = under && under.closest(".slot");
+  if (slot) slot.classList.add("over");
+}
+
+function endDrag(clientX, clientY) {
+  document.querySelectorAll(".slot").forEach(s => s.classList.remove("over"));
+  if (ghost) { ghost.remove(); ghost = null; }
+  document.querySelectorAll(".tile.dragging").forEach(el => el.classList.remove("dragging"));
+  if (!drag) return;
+  const under = document.elementFromPoint(clientX, clientY);
+  const slotEl = under && under.closest(".slot");
+  if (slotEl) {
+    const si = +slotEl.dataset.slot;
+    if (drag.from === "slot" && drag.slotIndex !== undefined) {
+      // moving within slots: free source first if different
+      if (drag.slotIndex !== si) {
+        const src = slots[drag.slotIndex];
+        const tid = src.tileId;
+        clearSlot(drag.slotIndex);
+        placeTileInSlot(tid, si);
+      }
+    } else {
+      placeTileInSlot(drag.tileId, si);
+    }
+  } else if (drag.from === "slot") {
+    // dropped outside → return to tray
+    clearSlot(drag.slotIndex);
+  }
+  drag = null;
+}
+
+elTray.addEventListener("pointerdown", e => {
+  const t = e.target.closest(".tile");
+  if (!t || t.classList.contains("used")) return;
+  e.preventDefault();
+  t.setPointerCapture?.(e.pointerId);
+  startDrag(e.clientX, e.clientY, t.dataset.tile, "tray");
+});
+
+elSlots.addEventListener("pointerdown", e => {
+  const s = e.target.closest(".slot");
+  if (!s || !s.classList.contains("filled")) return;
+  e.preventDefault();
+  const si = +s.dataset.slot;
+  const tid = slots[si].tileId;
+  startDrag(e.clientX, e.clientY, tid, "slot", si);
+});
+
+window.addEventListener("pointermove", e => {
+  if (!drag) return;
+  moveDrag(e.clientX, e.clientY);
+});
+window.addEventListener("pointerup", e => {
+  if (!drag) return;
+  endDrag(e.clientX, e.clientY);
+});
+window.addEventListener("pointercancel", e => {
+  if (!drag) return;
+  endDrag(e.clientX, e.clientY);
+});
+
+btnCheck.addEventListener("click", check);
+btnNext.addEventListener("click", next);
+btnClear.addEventListener("click", clearAll);
+btnHint.addEventListener("click", peek);
+btnRestart.addEventListener("click", () => {
+  elDone.hidden = true;
+  elGame.hidden = false;
+  loadWord(0);
+});
+
+loadWord(0);
+</script>
+</body>
+</html>
